@@ -1,0 +1,11 @@
+Model Information:
+* title:	Mushroom Girl
+* source:	https://sketchfab.com/3d-models/mushroom-girl-68e8cfa8c5fa4ec093169a9aa416dda6
+* author:	Avariax (https://sketchfab.com/avariax)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Mushroom Girl" (https://sketchfab.com/3d-models/mushroom-girl-68e8cfa8c5fa4ec093169a9aa416dda6) by Avariax (https://sketchfab.com/avariax) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
