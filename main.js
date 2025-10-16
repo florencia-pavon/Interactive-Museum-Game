@@ -25,6 +25,15 @@ let estatuaBoundingBox = null;
 let vallaBoundingBox = null; 
 let luzValla = null; 
 const VALLA_Z = -35; // Posición Z fija para valla y lámparas
+let cuadroGrito = null; // Variable para el modelo del cuadro "El Grito"
+
+// --- VARIABLES GLOBALES DE AUDIO ---
+let listener;
+let audioLoader;
+let audioAmbiente = null; // Inicializado a null
+let audioGrito;
+const DISTANCIA_GRITO = 20; // Aumentada a 20 unidades
+let gritoReproducido = false; // Controla si el grito ya sonó en esta aproximación
 
 
 // --- ESCENA Y RENDERIZADOR ---
@@ -57,6 +66,24 @@ cameraVertical.add(camara);
 
 cameraPivot.add(cameraVertical);
 escena.add(cameraPivot);
+
+// --- INICIALIZACIÓN DE AUDIO ---
+listener = new THREE.AudioListener();
+camara.add(listener); // Adjuntamos el "oído" a la cámara
+
+audioLoader = new THREE.AudioLoader();
+
+// --- CARGA DE SONIDO AMBIENTAL (SOLO CARGAMOS EL BUFFER, NO REPRODUCIMOS AQUÍ) ---
+audioLoader.load('assets/sounds/museum_ambient.mp3', function(buffer) {
+    audioAmbiente = new THREE.Audio(listener);
+    audioAmbiente.setBuffer(buffer);
+    audioAmbiente.setLoop(true); 
+    audioAmbiente.setVolume(0.5); 
+    // audioAmbiente.play(); <--- YA NO SE REPRODUCE AQUÍ
+    console.log('Sonido ambiental del museo cargado. Esperando interacción para reproducir.');
+}, undefined, function(error) {
+    console.warn('Error al cargar el sonido ambiental. Asegúrate de tener "assets/sounds/museum_ambient.mp3".');
+});
 
 
 // --- ILUMINACIÓN GLOBAL Y HONGUITO ---
@@ -157,9 +184,19 @@ window.addEventListener('keyup', (event) => {
 });
 
 
-// --- LÓGICA DE MOUSE Y VISTA ---
+// --- LÓGICA DE MOUSE Y VISTA (MODIFICADA) ---
 document.body.addEventListener('click', () => {
-    if (!isLocked) renderizador.domElement.requestPointerLock();
+    if (!isLocked) {
+        // Al hacer clic para bloquear el puntero, intentamos reproducir el audio
+        if (audioAmbiente && !audioAmbiente.isPlaying) {
+            audioAmbiente.context.resume().then(() => {
+                 audioAmbiente.play();
+            }).catch(e => {
+                console.error("Error al reanudar el contexto de audio y reproducir:", e);
+            });
+        }
+        renderizador.domElement.requestPointerLock();
+    }
 });
 
 document.addEventListener('pointerlockchange', () => {
@@ -317,16 +354,7 @@ gltfLoader.load(
 
         escena.add(lampara);
         
-        // LUZ DE LA LÁMPARA (SpotLight centrado)
-        const spotLight = new THREE.SpotLight(0xffffff, 0.5, 18, 30,  Math.PI / 16, 0.1, 2 );
-        spotLight.position.set(0, LAMPARA_Y_POS, VALLA_Z); 
-        spotLight.target.position.set(0, LAMPARA_Y_POS - 1, VALLA_Z); // Apunta al suelo justo debajo de la lámpara (donde está la valla)
-        spotLight.castShadow = true;
-        escena.add(spotLight);
-        escena.add(spotLight.target);
 
-
-        console.log('Lámpara de techo única cargada y centrada sobre la valla.');
 
     },
     undefined,
@@ -334,6 +362,70 @@ gltfLoader.load(
         console.error('Error al cargar la Lámpara:', error);
     }
 );
+
+// --- CARGA DEL MODELO 3D (Cuadro: El Grito) ---
+const CUADRO_GRITO_Z = -mitadProfundidad + 0.1; // -39.9 (Justo en frente de la pared del fondo)
+const CUADRO_GRITO_Y = mitadAlto; // Altura centrada (10)
+const CUADRO_GRITO_X = 2; // Nueva posición X: 2 unidades a la derecha del centro (0)
+const CUADRO_GRITO_SCALE = 10; // ESCALA AUMENTADA: de 5.0 a 10.0
+
+gltfLoader.load(
+    'assets/models/the_scream.glb', // RUTA DEL MODELO
+    function (gltf) {
+        cuadroGrito = gltf.scene;
+        
+    
+        cuadroGrito.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y, CUADRO_GRITO_Z); 
+        cuadroGrito.scale.set(CUADRO_GRITO_SCALE, CUADRO_GRITO_SCALE, CUADRO_GRITO_SCALE); 
+        
+        // Configurar sombras y asignar un nombre para Raycasting (futura funcionalidad)
+        cuadroGrito.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                child.name = 'Cuadro_El_Grito'; // Nombre único para la detección de clics
+            }
+        });
+        
+        escena.add(cuadroGrito);
+
+        // --- LUZ DEDICADA PARA EL CUADRO (SpotLight) --
+        const luzCuadroGrito = new THREE.SpotLight(0xffffff, 30, 10, Math.PI / 7, 0.5, 0.5); // Intensidad alta (50) para destacarlo
+        
+        // Posición de la luz: ligeramente en frente y arriba del cuadro
+        luzCuadroGrito.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y + 5, CUADRO_GRITO_Z + 5); 
+        luzCuadroGrito.castShadow = false; // Desactivamos sombras para esta luz para mejor rendimiento
+        
+        // El objetivo de la luz debe ser el centro del cuadro
+        const targetCuadro = new THREE.Object3D();
+        targetCuadro.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y, CUADRO_GRITO_Z);
+        escena.add(targetCuadro);
+        luzCuadroGrito.target = targetCuadro;
+
+        escena.add(luzCuadroGrito);
+
+        // --- SONIDO POSICIONAL DEL GRITO (AJUSTADO) ---
+        audioGrito = new THREE.PositionalAudio(listener);
+        audioLoader.load('assets/sounds/terrifying_scream.mp3', function(buffer) {
+            audioGrito.setBuffer(buffer);
+            audioGrito.setRefDistance(8); // CLAVE: Aumentado a 8 para que suene al MÁXIMO volumen en el momento de la activación (zonaActivacion = 9.0)
+            audioGrito.setMaxDistance(20); // Aumentado para un fade-out más largo
+            audioGrito.setRolloffFactor(1); 
+            audioGrito.setLoop(false); // NO REPETIR (UNA SOLA VEZ)
+        }, undefined, function(error) {
+            console.warn('Error al cargar el sonido del grito. Asegúrate de tener "assets/sounds/terrifying_scream.mp3".');
+        });
+        cuadroGrito.add(audioGrito); // Se adjunta al cuadro
+        
+        console.log('Cuadro "El Grito" cargado, escalado y posicionado. Luz puntual agregada.');
+
+    },
+    undefined,
+    function (error) {
+        console.error('Error al cargar el cuadro "El Grito":', error);
+    }
+);
+
 
 // --- FUNCIÓN DE ANIMACIÓN (LOOP PRINCIPAL DEL JUEGO) ---
 function animar() {
@@ -464,6 +556,34 @@ function animar() {
       // 6. Iluminación Local
       luzHonguito.position.copy(modeloGLTF.position);
       luzHonguito.position.y += 2.5; 
+
+      // 7. Lógica de Proximidad de Audio (El Grito - ÚNICA VEZ)
+      if (cuadroGrito && audioGrito && audioGrito.buffer) {
+          const distanciaAlGrito = modeloGLTF.position.distanceTo(cuadroGrito.position);
+          
+          const zonaActivacion = 9.0; // Distancia a la que se activa el grito
+          const zonaReseteo = 12.0;  // Distancia a la que se puede volver a activar
+
+          if (distanciaAlGrito < zonaActivacion) { 
+              if (!gritoReproducido) {
+                  // Aseguramos que el contexto de audio esté activo antes de reproducir
+                  audioGrito.context.resume().then(() => {
+                      if (audioGrito.isPlaying) audioGrito.stop(); 
+                      audioGrito.play();
+                      gritoReproducido = true;
+                      // Baja el volumen ambiente para destacar el grito
+                      if (audioAmbiente && audioAmbiente.isPlaying) audioAmbiente.setVolume(0.1); 
+                  }).catch(e => {
+                      console.error("Error al reanudar el contexto de audio para el grito:", e);
+                  });
+              }
+          } else if (distanciaAlGrito > zonaReseteo) {
+              // Resetear el estado si se aleja lo suficiente
+              gritoReproducido = false; 
+              // Volver al volumen ambiente normal
+              if (audioAmbiente && audioAmbiente.isPlaying) audioAmbiente.setVolume(0.5); 
+          }
+      }
   }
 
 

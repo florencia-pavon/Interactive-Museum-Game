@@ -1,0 +1,11 @@
+Model Information:
+* title:	Psychedelic spheres
+* source:	https://sketchfab.com/3d-models/psychedelic-spheres-a7b7407801ad4da2b1b31c916a29a316
+* author:	Miguelangelo Rosario (https://sketchfab.com/miguelangelo2k)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Psychedelic spheres" (https://sketchfab.com/3d-models/psychedelic-spheres-a7b7407801ad4da2b1b31c916a29a316) by Miguelangelo Rosario (https://sketchfab.com/miguelangelo2k) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
