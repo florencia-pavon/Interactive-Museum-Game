@@ -30,7 +30,7 @@ let cuadroGrito = null; // Variable para el modelo del cuadro "El Grito"
 // --- VARIABLES GLOBALES DE AUDIO ---
 let listener;
 let audioLoader;
-let audioAmbiente = null; // Inicializado a null
+let audioAmbiente = null; 
 let audioGrito;
 const DISTANCIA_GRITO = 20; // Aumentada a 20 unidades
 let gritoReproducido = false; // Controla si el grito ya sonó en esta aproximación
@@ -73,13 +73,12 @@ camara.add(listener); // Adjuntamos el "oído" a la cámara
 
 audioLoader = new THREE.AudioLoader();
 
-// --- CARGA DE SONIDO AMBIENTAL (SOLO CARGAMOS EL BUFFER, NO REPRODUCIMOS AQUÍ) ---
+// --- CARGA DE SONIDO AMBIENTAL ---
 audioLoader.load('assets/sounds/museum_ambient.mp3', function(buffer) {
     audioAmbiente = new THREE.Audio(listener);
     audioAmbiente.setBuffer(buffer);
     audioAmbiente.setLoop(true); 
     audioAmbiente.setVolume(0.5); 
-    // audioAmbiente.play(); <--- YA NO SE REPRODUCE AQUÍ
     console.log('Sonido ambiental del museo cargado. Esperando interacción para reproducir.');
 }, undefined, function(error) {
     console.warn('Error al cargar el sonido ambiental. Asegúrate de tener "assets/sounds/museum_ambient.mp3".');
@@ -184,13 +183,14 @@ window.addEventListener('keyup', (event) => {
 });
 
 
-// --- LÓGICA DE MOUSE Y VISTA (MODIFICADA) ---
+// --- LÓGICA DE MOUSE Y VISTA (ACTIVACIÓN DE AUDIO) ---
 document.body.addEventListener('click', () => {
     if (!isLocked) {
         // Al hacer clic para bloquear el puntero, intentamos reproducir el audio
-        if (audioAmbiente && !audioAmbiente.isPlaying) {
+        if (audioAmbiente && audioAmbiente.buffer && !audioAmbiente.isPlaying) {
             audioAmbiente.context.resume().then(() => {
                  audioAmbiente.play();
+                 console.log('Audio Ambiental Iniciado tras clic del usuario.');
             }).catch(e => {
                 console.error("Error al reanudar el contexto de audio y reproducir:", e);
             });
@@ -408,12 +408,13 @@ gltfLoader.load(
         audioGrito = new THREE.PositionalAudio(listener);
         audioLoader.load('assets/sounds/terrifying_scream.mp3', function(buffer) {
             audioGrito.setBuffer(buffer);
-            audioGrito.setRefDistance(8); // CLAVE: Aumentado a 8 para que suene al MÁXIMO volumen en el momento de la activación (zonaActivacion = 9.0)
+            audioGrito.setRefDistance(8); // CLAVE: Aumentado a 8 para que suene al MÁXIMO volumen en la activación
             audioGrito.setMaxDistance(20); // Aumentado para un fade-out más largo
             audioGrito.setRolloffFactor(1); 
             audioGrito.setLoop(false); // NO REPETIR (UNA SOLA VEZ)
+            console.log('Buffer de audio del Grito cargado exitosamente.'); 
         }, undefined, function(error) {
-            console.warn('Error al cargar el sonido del grito. Asegúrate de tener "assets/sounds/terrifying_scream.mp3".');
+            console.warn('Error CRÍTICO al cargar el sonido del grito. Revisa la ruta: "assets/sounds/terrifying_scream.mp3".');
         });
         cuadroGrito.add(audioGrito); // Se adjunta al cuadro
         
@@ -559,18 +560,28 @@ function animar() {
 
       // 7. Lógica de Proximidad de Audio (El Grito - ÚNICA VEZ)
       if (cuadroGrito && audioGrito && audioGrito.buffer) {
-          const distanciaAlGrito = modeloGLTF.position.distanceTo(cuadroGrito.position);
+          // CLAVE: Creamos vectores temporales y ajustamos Y=0 para calcular la distancia horizontal
+          const playerPosXZ = modeloGLTF.position.clone();
+          const cuadroPosXZ = cuadroGrito.position.clone();
           
-          const zonaActivacion = 9.0; // Distancia a la que se activa el grito
-          const zonaReseteo = 12.0;  // Distancia a la que se puede volver a activar
+          playerPosXZ.y = 0;
+          cuadroPosXZ.y = 0;
+          
+          const distanciaAlGrito = playerPosXZ.distanceTo(cuadroPosXZ); // ¡CORRECCIÓN APLICADA!
+          
+          const zonaActivacion = 9.0; 
+          const zonaReseteo = 12.0;  
 
           if (distanciaAlGrito < zonaActivacion) { 
               if (!gritoReproducido) {
-                  // Aseguramos que el contexto de audio esté activo antes de reproducir
+                  // Reanuda el contexto de audio justo antes de reproducir, como doble verificación
                   audioGrito.context.resume().then(() => {
                       if (audioGrito.isPlaying) audioGrito.stop(); 
                       audioGrito.play();
                       gritoReproducido = true;
+                      
+                      console.log('¡ZONA DE GRITO ALCANZADA! Reproduciendo...'); 
+                      
                       // Baja el volumen ambiente para destacar el grito
                       if (audioAmbiente && audioAmbiente.isPlaying) audioAmbiente.setVolume(0.1); 
                   }).catch(e => {
