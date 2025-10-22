@@ -1,77 +1,87 @@
-// main.js - CÓDIGO COMPLETO CON HONGUITO, COLISIÓN, VALLA, LUZ DE EXHIBICIÓN Y UNA SOLA LÁMPARA CENTRADA
+// --- CONFIGURACIÓN SALA DIMENSIONES ---
+const ANCHO_SALA = 60;
+const ALTO_SALA = 20;
+const PROFUNDIDAD_SALA = 80;
 
-// --- IMPORTANTE: CONFIGURACIÓN DE LA SALA ---
-const ANCHO_SALA = 60;   
-const ALTO_SALA = 20;    
-const PROFUNDIDAD_SALA = 80; 
+// --- AJUSTES MOVIMIENTO CÁMARA ---
+const VELOCIDAD = 5.0;
+const ALTURA_HONGUITO = 0.2;
+const RADIO_COLISION = 0.5;
+const DISTANCIA_CAMARA = 8;
+const ALTURA_CAMARA_SEGUIMIENTO = 4.5;
 
-// --- AJUSTES DE JUEGO Y MOVIMIENTO ---
-const VELOCIDAD = 5.0; 
-const ALTURA_HONGUITO = 0.2; // Altura sobre el piso
-const RADIO_COLISION = 0.5; // El radio de la esfera del honguito
-const DISTANCIA_CAMARA = 8; 
-const ALTURA_CAMARA_SEGUIMIENTO = 4.5; 
+// --- CONTROL MOUSE BLOQUEO ---
+const VELOCIDAD_MOUSE = 0.002;
+let isLocked = false;
 
-// Control de Mouse
-const VELOCIDAD_MOUSE = 0.002; 
-let isLocked = false; 
+// --- OBJETOS CÁMARA PIVOTE ---
+let cameraPivot = new THREE.Object3D();
+let cameraVertical = new THREE.Object3D();
 
-// Variables de Cámaras
-let cameraPivot = new THREE.Object3D(); 
-let cameraVertical = new THREE.Object3D(); 
-
-// --- VARIABLES GLOBALES PARA COLISIÓN Y MODELOS ---
+// --- VARIABLES COLISIÓN POSICIÓN ---
 let estatuaBoundingBox = null;
-let vallaBoundingBox = null; 
-const VALLA_Z = -35; // Posición Z fija para valla y lámparas
+let vallaBoundingBox = null;
+const VALLA_Z = -35;
+const ESTATUA_POS = new THREE.Vector3(0, 0, 0);
 
-// --- EXHIBICIÓN CUADRO 1: EL GRITO ---
-let cuadroGrito = null; 
-let luzValla = null; 
+// --- EXHIBICIÓN CUADRO GRITO ---
+let cuadroGrito = null;
+let luzValla = null;
 
-// --- EXHIBICIÓN CUADRO 2: INSANITY IN MOTION ---
-let cuadroInsanity = null;
-let vallaInsanityBoundingBox = null; 
-let mixerInsanity = null;
-let actionInsanity = null;
+// --- EXHIBICIÓN CUADRO ENGRANAJE ---
+let cuadroEngranaje = null;
+let vallaEngranajeBoundingBox = null;
+let mixerEngranaje = null;
+let actionEngranaje = null;
 
-// --- EXHIBICIÓN CUADRO 3: TECHNICAL DIFFICULTIES ---
-let cuadroMandala = null;
-let vallaMandalaBoundingBox = null;
-let mixerTechnical = null; 
-let actionTechnical = null; 
+// --- EXHIBICIÓN CUADRO TELEVISORES ---
+let cuadroTelevisores = null;
+let vallaTelevisoresBoundingBox = null;
+let mixerTechnical = null;
+let actionTechnical = null;
+let cuadroTelevisoresBoundingBox = null; // NUEVO: Bounding box para el cuadro Televisores
 
-// --- EXHIBICIÓN CUADRO 4: GARDEN (NUEVAS VARIABLES) ---
+// --- EXHIBICIÓN CUADRO GARDEN ---
 let cuadroGarden = null;
 let vallaGardenBoundingBox = null;
-let mixerGarden = null; // Nuevo mixer para Garden
-let actionGarden = null; // Nueva acción para Garden
+let mixerGarden = null;
+let actionGarden = null;
+let cuadroGardenBoundingBox = null; // NUEVO: Bounding box para el cuadro Garden
 
+// --- EXHIBICIÓN ARTE USUARIO ---
+let userArtMesh = null;
+let isPromptVisible = false;
+let isDrawingMode = false;
+let drawingCanvasContext = null;
+let userArtTexture = null;
 
-// --- VARIABLES GLOBALES DE AUDIO ---
+// --- VARIABLES GESTIÓN AUDIO ---
 let listener;
 let audioLoader;
-let audioAmbiente = null; 
+let audioAmbiente = null;
 let audioGrito;
-const DISTANCIA_GRITO = 20; // Aumentada a 20 unidades
-let gritoReproducido = false; // Controla si el grito ya sonó en esta aproximación
+const DISTANCIA_GRITO = 20;
+let gritoReproducido = false;
 
+// --- VECTORES RAYCASTER INTERACCIÓN ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
 
-// --- ESCENA Y RENDERIZADOR ---
+// --- INICIALIZAR ESCENA COLOR ---
 const escena = new THREE.Scene();
 escena.background = new THREE.Color(0xaaaaaa);
 
+// --- CONFIGURAR RENDERIZADOR SOMBRAS ---
 const renderizador = new THREE.WebGLRenderer({
   canvas: document.querySelector("#miCanvas"),
-  antialias: true
+  antialias: true,
 });
 renderizador.setSize(window.innerWidth, window.innerHeight);
 renderizador.setPixelRatio(window.devicePixelRatio);
 renderizador.shadowMap.enabled = true;
-renderizador.shadowMap.type = THREE.PCFSoftShadowMap; 
+renderizador.shadowMap.type = THREE.PCFSoftShadowMap;
 
-
-// --- CÁMARA (TERCERA PERSONA con PIVOT) ---
+// --- CONFIGURAR CÁMARA PIVOTE ---
 const camara = new THREE.PerspectiveCamera(
   75,
   window.innerWidth / window.innerHeight,
@@ -79,59 +89,64 @@ const camara = new THREE.PerspectiveCamera(
   1000
 );
 
-camara.position.set(0, 0, DISTANCIA_CAMARA); 
+camara.position.set(0, 0, DISTANCIA_CAMARA);
 camara.lookAt(0, 0, 0);
 
-cameraVertical.position.y = ALTURA_CAMARA_SEGUIMIENTO; 
+cameraVertical.position.y = ALTURA_CAMARA_SEGUIMIENTO;
 cameraVertical.add(camara);
 
 cameraPivot.add(cameraVertical);
 escena.add(cameraPivot);
 
-// --- INICIALIZACIÓN DE AUDIO ---
+// --- INICIALIZAR ESCUCHA CARGADOR ---
 listener = new THREE.AudioListener();
-camara.add(listener); // Adjuntamos el "oído" a la cámara
+camara.add(listener);
 
 audioLoader = new THREE.AudioLoader();
 
-// --- CARGA DE SONIDO AMBIENTAL ---
-audioLoader.load('assets/sounds/museum_ambient.mp3', function(buffer) {
+// --- CARGAR AUDIO AMBIENTAL ---
+audioLoader.load(
+  "assets/sounds/museum_ambient.mp3",
+  function (buffer) {
     audioAmbiente = new THREE.Audio(listener);
     audioAmbiente.setBuffer(buffer);
-    audioAmbiente.setLoop(true); 
-    audioAmbiente.setVolume(0.5); 
-    console.log('Sonido ambiental del museo cargado. Esperando interacción para reproducir.');
-}, undefined, function(error) {
-    console.warn('Error al cargar el sonido ambiental. Asegúrate de tener "assets/sounds/museum_ambient.mp3".');
-});
+    audioAmbiente.setLoop(true);
+    audioAmbiente.setVolume(0.5);
+  },
+  undefined,
+  function (error) {
+    console.warn(
+      'Error al cargar el sonido ambiental. Asegúrate de tener "assets/sounds/museum_ambient.mp3".'
+    );
+  }
+);
 
-
-// --- ILUMINACIÓN GLOBAL Y HONGUITO ---
+// --- CONFIGURAR ILUMINACIÓN GLOBAL ---
 const luzAmbiental = new THREE.AmbientLight(0xffffff, 0.4);
 escena.add(luzAmbiental);
 
-const luzDireccional = new THREE.DirectionalLight(0xffffff, 1.5); 
-luzDireccional.position.set(20, 30, 20); 
-luzDireccional.castShadow = true; 
+const luzDireccional = new THREE.DirectionalLight(0xffffff, 1.5);
+luzDireccional.position.set(20, 30, 20);
+luzDireccional.castShadow = true;
 luzDireccional.shadow.camera.near = 0.1;
 luzDireccional.shadow.camera.far = 100;
 luzDireccional.shadow.mapSize.width = 1024;
 luzDireccional.shadow.mapSize.height = 1024;
 escena.add(luzDireccional);
 
-const luzHonguito = new THREE.PointLight(0xffffff, 1, 2); 
+const luzHonguito = new THREE.PointLight(0xffffff, 1, 2);
 escena.add(luzHonguito);
 
-
-// --- CARGA DE TEXTURAS Y MATERIALES ---
+// --- CARGAR TEXTURAS MATERIALES ---
 const loader = new THREE.TextureLoader();
-const texturaPiso = loader.load('assets/images/piso.jpg');
-const texturaTecho = loader.load('assets/images/techo.jpg');
-const texturaPared = loader.load('assets/images/pared.jpg');
+const texturaPiso = loader.load("assets/images/piso.jpg");
+const texturaTecho = loader.load("assets/images/techo.jpg");
+const texturaPared = loader.load("assets/images/pared.jpg");
 
+// --- FUNCIÓN REPETIR TEXTURA ---
 const setRepeat = (texture, scaleX, scaleY) => {
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(scaleX, scaleY);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(scaleX, scaleY);
 };
 
 setRepeat(texturaPiso, ANCHO_SALA / 2, PROFUNDIDAD_SALA / 2);
@@ -141,875 +156,1322 @@ setRepeat(texturaPared, ANCHO_SALA / 2, ALTO_SALA / 2);
 const materialPiso = new THREE.MeshStandardMaterial({ map: texturaPiso });
 const materialTecho = new THREE.MeshStandardMaterial({ map: texturaTecho });
 
-const materialParedUnico = new THREE.MeshStandardMaterial({ 
-    map: texturaPared,
-    side: THREE.DoubleSide 
-}); 
+const materialParedUnico = new THREE.MeshStandardMaterial({
+  map: texturaPared,
+  side: THREE.DoubleSide,
+});
 
-
-// --- CONSTRUCCIÓN DE LA SALA ---
+// --- CALCULAR DIMENSIONES GEOMETRÍAS ---
 const mitadAncho = ANCHO_SALA / 2;
 const mitadProfundidad = PROFUNDIDAD_SALA / 2;
 const mitadAlto = ALTO_SALA / 2;
 
-const geometriaPisoTecho = new THREE.PlaneGeometry(ANCHO_SALA, PROFUNDIDAD_SALA);
-const geometriaParedFondo = new THREE.PlaneGeometry(ANCHO_SALA, ALTO_SALA); 
-const geometriaParedLateral = new THREE.PlaneGeometry(PROFUNDIDAD_SALA, ALTO_SALA); 
+const geometriaPisoTecho = new THREE.PlaneGeometry(
+  ANCHO_SALA,
+  PROFUNDIDAD_SALA
+);
+const geometriaParedFondo = new THREE.PlaneGeometry(ANCHO_SALA, ALTO_SALA);
+const geometriaParedLateral = new THREE.PlaneGeometry(
+  PROFUNDIDAD_SALA,
+  ALTO_SALA
+);
 
-// Piso
+// --- CONSTRUIR PISO TECHO PAREDES ---
 const piso = new THREE.Mesh(geometriaPisoTecho, materialPiso);
 piso.rotation.x = -Math.PI / 2;
 piso.position.y = 0;
-piso.receiveShadow = true; 
+piso.receiveShadow = true;
 escena.add(piso);
 
-// Techo
 const techo = new THREE.Mesh(geometriaPisoTecho, materialTecho);
 techo.rotation.x = Math.PI / 2;
 techo.position.y = ALTO_SALA;
 escena.add(techo);
 
-// Paredes (código abreviado para concisión, mantén la versión completa)
 const pared1 = new THREE.Mesh(geometriaParedFondo, materialParedUnico);
-pared1.position.set(0, mitadAlto, -mitadProfundidad); pared1.receiveShadow = true; escena.add(pared1);
+pared1.position.set(0, mitadAlto, -mitadProfundidad);
+pared1.receiveShadow = true;
+escena.add(pared1);
 const pared2 = new THREE.Mesh(geometriaParedFondo, materialParedUnico);
-pared2.rotation.y = Math.PI; pared2.position.set(0, mitadAlto, mitadProfundidad); pared2.receiveShadow = true; escena.add(pared2);
+pared2.rotation.y = Math.PI;
+pared2.position.set(0, mitadAlto, mitadProfundidad);
+pared2.receiveShadow = true;
+escena.add(pared2);
 const pared3 = new THREE.Mesh(geometriaParedLateral, materialParedUnico);
-pared3.rotation.y = -Math.PI / 2; pared3.position.set(-mitadAncho, mitadAlto, 0); pared3.receiveShadow = true; escena.add(pared3);
+pared3.rotation.y = -Math.PI / 2;
+pared3.position.set(-mitadAncho, mitadAlto, 0);
+pared3.receiveShadow = true;
+escena.add(pared3);
 const pared4 = new THREE.Mesh(geometriaParedLateral, materialParedUnico);
-pared4.rotation.y = Math.PI / 2; pared4.position.set(mitadAncho, mitadAlto, 0); pared4.receiveShadow = true; escena.add(pared4);
+pared4.rotation.y = Math.PI / 2;
+pared4.position.set(mitadAncho, mitadAlto, 0);
+pared4.receiveShadow = true;
+escena.add(pared4);
 
+// --- CONFIGURAR SISTEMA DIBUJO ---
+function setupDrawingSystem() {
+  const canvas = document.getElementById("drawing-canvas");
+  const ctx = canvas.getContext("2d");
+  const colorPicker = document.getElementById("color-picker");
+  const finishButton = document.getElementById("finish-drawing");
+  const cancelButton = document.getElementById("cancel-drawing");
 
-// --- LÓGICA DE MOVIMIENTO Y TECLADO ---
+  drawingCanvasContext = ctx;
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  let isPainting = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  ctx.lineWidth = 8;
+  ctx.lineCap = "round";
+
+  const draw = (e) => {
+    if (!isPainting) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    ctx.beginPath();
+    ctx.strokeStyle = colorPicker.value;
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(mouseX, mouseY);
+    ctx.stroke();
+
+    [lastX, lastY] = [mouseX, mouseY];
+  };
+
+  const startPosition = (e) => {
+    isPainting = true;
+    const rect = canvas.getBoundingClientRect();
+    [lastX, lastY] = [e.clientX - rect.left, e.clientY - rect.top];
+  };
+
+  const endPosition = () => {
+    isPainting = false;
+  };
+
+  canvas.addEventListener("mousedown", startPosition);
+  canvas.addEventListener("mousemove", draw);
+  canvas.addEventListener("mouseup", endPosition);
+  canvas.addEventListener("mouseout", endPosition);
+
+  finishButton.addEventListener("click", () => {
+    applyDrawingToThreeJS(canvas);
+    exitDrawingMode();
+  });
+
+  cancelButton.addEventListener("click", () => {
+    exitDrawingMode();
+  });
+
+  document.getElementById("prompt-yes").addEventListener("click", () => {
+    hidePrompt();
+    startDrawingMode();
+  });
+
+  document.getElementById("prompt-no").addEventListener("click", hidePrompt);
+}
+
+// --- INICIAR MODO DIBUJO ---
+function startDrawingMode() {
+  isDrawingMode = true;
+  document.getElementById("drawing-ui").style.display = "block";
+
+  document.exitPointerLock();
+  isLocked = false;
+
+  if (actionEngranaje) actionEngranaje.paused = true;
+  if (actionTechnical) actionTechnical.paused = true;
+  if (actionGarden) actionGarden.paused = true;
+}
+
+// --- SALIR MODO DIBUJO ---
+function exitDrawingMode() {
+  isDrawingMode = false;
+  document.getElementById("drawing-ui").style.display = "none";
+
+  hidePrompt();
+
+  if (actionEngranaje) actionEngranaje.paused = false;
+  if (actionTechnical) actionTechnical.paused = false;
+  if (actionGarden) actionGarden.paused = false;
+}
+
+// --- ACTUALIZAR TEXTURA 3D ---
+function applyDrawingToThreeJS(canvas) {
+  if (userArtMesh) {
+    if (!userArtTexture) {
+      userArtTexture = new THREE.CanvasTexture(canvas);
+      userArtTexture.minFilter = THREE.LinearFilter;
+      userArtMesh.material = new THREE.MeshStandardMaterial({
+        map: userArtTexture,
+        side: THREE.DoubleSide,
+      });
+    } else {
+      userArtTexture.needsUpdate = true;
+    }
+  }
+}
+
+// --- MOSTRAR PROMPT INTERACCIÓN ---
+function showPrompt() {
+  if (isDrawingMode || isPromptVisible) return;
+  isPromptVisible = true;
+  document.getElementById("interaction-prompt").style.display = "block";
+  document.exitPointerLock();
+  isLocked = false;
+  console.log("Prompt de interacción visible.");
+}
+
+// --- OCULTAR PROMPT RESTAURAR ---
+function hidePrompt() {
+  isPromptVisible = false;
+  document.getElementById("interaction-prompt").style.display = "none";
+  document.body.requestPointerLock();
+}
+
+// --- VARIABLES MODELO JUGADOR ---
 let modeloGLTF = null;
 let mixer = null;
-let walkAction = null; 
-let currentAnimation = null; 
+let walkAction = null;
+let currentAnimation = null;
 
-const clock = new THREE.Clock(); 
+const clock = new THREE.Clock();
 const keys = {
-    ArrowUp: false, 'w': false,
-    ArrowDown: false, 's': false,
-    ArrowLeft: false, 'a': false,
-    ArrowRight: false, 'd': false
+  ArrowUp: false,
+  w: false,
+  ArrowDown: false,
+  s: false,
+  ArrowLeft: false,
+  a: false,
+  ArrowRight: false,
+  d: false,
 };
 
-window.addEventListener('keydown', (event) => {
-    const key = event.key.toLowerCase();
-    if (keys.hasOwnProperty(key)) keys[key] = true;
+// --- GESTIÓN ENTRADA TECLADO ---
+window.addEventListener("keydown", (event) => {
+  const key = event.key.toLowerCase();
+
+  if (key === "g" && !isDrawingMode && !isPromptVisible) {
+    showPrompt();
+    return;
+  }
+
+  if (keys.hasOwnProperty(key)) keys[key] = true;
 });
-window.addEventListener('keyup', (event) => {
-    const key = event.key.toLowerCase();
-    if (keys.hasOwnProperty(key)) keys[key] = false;
+window.addEventListener("keyup", (event) => {
+  const key = event.key.toLowerCase();
+  if (keys.hasOwnProperty(key)) keys[key] = false;
 });
 
+// --- GESTIÓN MOUSE VISTA ---
+document.body.addEventListener("click", () => {
+  if (isDrawingMode || isPromptVisible) return;
 
-// --- LÓGICA DE MOUSE Y VISTA (ACTIVACIÓN DE AUDIO) ---
-document.body.addEventListener('click', () => {
-    if (!isLocked) {
-        // Al hacer clic para bloquear el puntero, intentamos reproducir el audio
-        if (audioAmbiente && audioAmbiente.buffer && !audioAmbiente.isPlaying) {
-            audioAmbiente.context.resume().then(() => {
-                 audioAmbiente.play();
-                 console.log('Audio Ambiental Iniciado tras clic del usuario.');
-            }).catch(e => {
-                console.error("Error al reanudar el contexto de audio y reproducir:", e);
-            });
-        }
-        renderizador.domElement.requestPointerLock();
+  if (!isLocked) {
+    if (audioAmbiente && audioAmbiente.buffer && !audioAmbiente.isPlaying) {
+      audioAmbiente.context
+        .resume()
+        .then(() => {
+          audioAmbiente.play();
+        })
+        .catch((e) => {
+          console.error(
+            "Error al reanudar el contexto de audio y reproducir:",
+            e
+          );
+        });
     }
+    renderizador.domElement.requestPointerLock();
+  }
 });
 
-document.addEventListener('pointerlockchange', () => {
-    isLocked = document.pointerLockElement === renderizador.domElement;
+document.addEventListener("pointerlockchange", () => {
+  isLocked = document.pointerLockElement === renderizador.domElement;
 });
 
-document.addEventListener('mousemove', (event) => {
-    if (isLocked) {
-        cameraPivot.rotation.y -= event.movementX * VELOCIDAD_MOUSE;
+document.addEventListener("mousemove", (event) => {
+  if (isLocked) {
+    cameraPivot.rotation.y -= event.movementX * VELOCIDAD_MOUSE;
 
-        let deltaY = event.movementY * VELOCIDAD_MOUSE;
-        cameraVertical.rotation.x -= deltaY;
+    let deltaY = event.movementY * VELOCIDAD_MOUSE;
+    cameraVertical.rotation.x -= deltaY;
 
-        const limit = Math.PI / 2 - 0.1; 
-        cameraVertical.rotation.x = Math.max(-limit, Math.min(limit, cameraVertical.rotation.x));
-    }
+    const limit = Math.PI / 2 - 0.1;
+    cameraVertical.rotation.x = Math.max(
+      -limit,
+      Math.min(limit, cameraVertical.rotation.x)
+    );
+  }
 });
 
-
-// --- CARGA DEL MODELO 3D (Honguito) ---
+// --- CARGAR MODELO JUGADOR ---
 const gltfLoader = new THREE.GLTFLoader();
 
 gltfLoader.load(
-  'assets/models/mushroom_girl/scene.gltf', 
+  "assets/models/mushroom_girl/scene.gltf",
   function (gltf) {
-      
     modeloGLTF = gltf.scene;
 
-    modeloGLTF.position.set(0, ALTURA_HONGUITO, 20); 
-    modeloGLTF.scale.set(1.2, 1.2, 1.2); 
+    modeloGLTF.position.set(0, ALTURA_HONGUITO, 20);
+    modeloGLTF.scale.set(1.2, 1.2, 1.2);
     escena.add(modeloGLTF);
-    
+
     cameraPivot.position.set(modeloGLTF.position.x, 0, modeloGLTF.position.z);
-    
+
     modeloGLTF.traverse((child) => {
-        if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
-            if (Array.isArray(child.material)) {
-                child.material.forEach(m => m.needsUpdate = true);
-            } else {
-                child.material.needsUpdate = true;
-            }
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => (m.needsUpdate = true));
+        } else {
+          child.material.needsUpdate = true;
         }
+      }
     });
 
     if (gltf.animations && gltf.animations.length > 0) {
       mixer = new THREE.AnimationMixer(gltf.scene);
-      const walkClip = THREE.AnimationClip.findByName(gltf.animations, 'Walk') || gltf.animations[0];
+      const walkClip =
+        THREE.AnimationClip.findByName(gltf.animations, "Walk") ||
+        gltf.animations[0];
       if (walkClip) {
-          walkAction = mixer.clipAction(walkClip); 
-          walkAction.setLoop(THREE.LoopRepeat, Infinity); 
+        walkAction = mixer.clipAction(walkClip);
+        walkAction.setLoop(THREE.LoopRepeat, Infinity);
       }
     }
   },
   undefined,
   function (error) {
-    console.error('Error al cargar el modelo del Honguito:', error);
+    console.error("Error al cargar el modelo del Honguito:", error);
   }
 );
 
-
-// --- CARGA DEL MODELO 3D (Estatua de la Libertad) ---
+// --- CARGAR MODELO ESTATUA ---
 gltfLoader.load(
-  'assets/models/estatua_de_la_libertad.glb', 
+  "assets/models/estatua_de_la_libertad.glb",
   function (gltf) {
-      const estatua = gltf.scene;
-      
-      estatua.position.set(0, 0, 0); 
-      estatua.scale.set(5, 5, 5); 
+    const estatua = gltf.scene;
 
-      // Configurar sombras y calcular Bounding Box
-      estatua.traverse((child) => {
-          if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-          }
-      });
-      
-      escena.add(estatua);
+    estatua.position.set(0, 0, 0);
+    estatua.scale.set(5, 5, 5);
 
-      // --- CÁLCULO DE LA CAJA DELIMITADORA ---
-      const box = new THREE.Box3().setFromObject(estatua);
-      estatuaBoundingBox = box;
-      // ----------------------------------------
-      
-      console.log('Estatua de la Libertad cargada con éxito en el centro de la sala.');
+    estatua.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
 
+    escena.add(estatua);
+
+    const box = new THREE.Box3().setFromObject(estatua);
+    estatuaBoundingBox = box;
   },
   undefined,
   function (error) {
-    console.error('Error al cargar la Estatua de la Libertad:', error);
+    console.error("Error al cargar la Estatua de la Libertad:", error);
   }
 );
 
-
-// --- CARGA DEL MODELO 3D (Valla de Exhibición - Central) ---
+// --- CARGAR MODELO VALLA CUADRO EL GRITO ---
 gltfLoader.load(
-    'assets/models/valla/scene.gltf', // RUTA ASUMIDA: carpeta/scene.gltf
-    function (gltf) {
-        const valla = gltf.scene;
-        
-        // POSICIONAMIENTO
-        valla.position.set(0, 0, VALLA_Z); 
-        valla.scale.set(3.0, 3.0, 3.0); 
+  "assets/models/valla/scene.gltf",
+  function (gltf) {
+    const valla = gltf.scene;
 
-        // Configurar sombras y calcular Bounding Box
-        valla.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-        
-        escena.add(valla);
-        
-        // --- CÁLCULO DE LA CAJA DELIMITADORA DE LA VALLA ---
-        const box = new THREE.Box3().setFromObject(valla);
-        vallaBoundingBox = box;
-        
-        // --- AGREGAR LUZ AL CARTEL DE LA VALLA ---
-        luzValla = new THREE.PointLight(0xffffff, 5, 7); 
-        luzValla.position.set(1.5, valla.scale.y * 1.5, valla.position.z + 2); 
-        escena.add(luzValla);
-        
-        console.log('Valla de exhibición cargada con éxito frente a la pared trasera.');
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar la Valla de Exhibición:', error);
-    }
+    valla.position.set(0, 0, VALLA_Z);
+    valla.scale.set(3.0, 3.0, 3.0);
+
+    valla.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    escena.add(valla);
+
+    const box = new THREE.Box3().setFromObject(valla);
+    vallaBoundingBox = box;
+
+    luzValla = new THREE.PointLight(0xffffff, 5, 7);
+    luzValla.position.set(1.5, valla.scale.y * 1.5, valla.position.z + 2);
+    escena.add(luzValla);
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Valla de Exhibición:", error);
+  }
 );
 
-
-// --- CARGA DEL MODELO 3D (Lámpara Única Centrada) ---
-const LAMPARA_Y_OFFSET = 5.0; // Distancia para que cuelgue del techo (1 metro debajo)
-const LAMPARA_Y_POS = ALTO_SALA - LAMPARA_Y_OFFSET; // Posición Y final
-const LAMPARA_SCALE = 5.0; // ESCALA CORREGIDA: Ajustar si no se ve (probar 2.0 o 3.0)
+// --- CARGAR MODELO LÁMPARA CUADRO EL GRITO ---
+const LAMPARA_GRITO_Y_OFFSET = 5.0;
+const LAMPARA_GRITO_Y_POS = ALTO_SALA - LAMPARA_GRITO_Y_OFFSET;
+const LAMPARA_SCALE = 4.0;
 
 gltfLoader.load(
-    'assets/models/lamparas.glb', 
-    function (gltf) {
-        
-        const lampara = gltf.scene;
-        // Posición X=0, centrado sobre la valla
-        lampara.position.set(0, LAMPARA_Y_POS, VALLA_Z); 
-        lampara.scale.set(LAMPARA_SCALE, LAMPARA_SCALE, LAMPARA_SCALE); 
-        
-        lampara.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
+  "assets/models/lamparas.glb",
+  function (gltf) {
+    const lamparaGrito = gltf.scene;
+    lamparaGrito.position.set(0, LAMPARA_GRITO_Y_POS, VALLA_Z);
+    lamparaGrito.scale.set(LAMPARA_SCALE, LAMPARA_SCALE, LAMPARA_SCALE);
 
-        escena.add(lampara);
-        
+    lamparaGrito.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
 
+    escena.add(lamparaGrito);
 
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar la Lámpara:', error);
-    }
+    const spotLight = new THREE.SpotLight(
+      0xffffff,
+      0.5,
+      18,
+      30,
+      Math.PI / 16,
+      0.1,
+      2
+    );
+    spotLight.position.set(0, LAMPARA_GRITO_Y_POS, VALLA_Z);
+    spotLight.target.position.set(0, LAMPARA_GRITO_Y_POS - 1, VALLA_Z);
+    spotLight.castShadow = true;
+    escena.add(spotLight);
+    escena.add(spotLight.target);
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Lámpara:", error);
+  }
 );
 
-// --- CARGA DEL MODELO 3D (Cuadro 1: El Grito) ---
-const CUADRO_GRITO_Z = -mitadProfundidad + 0.1; // -39.9 (Justo en frente de la pared del fondo)
-const CUADRO_GRITO_Y = mitadAlto; // Altura centrada (10)
-const CUADRO_GRITO_X = 1; // Nueva posición X: 2 unidades a la derecha del centro (0)
-const CUADRO_GRITO_SCALE = 11; // ESCALA BASE PARA TODOS LOS CUADROS
+// --- CARGAR CUADRO GRITO ---
+const CUADRO_GRITO_Z = -mitadProfundidad + 0.1;
+const CUADRO_GRITO_Y = mitadAlto;
+const CUADRO_GRITO_X = 1;
+const CUADRO_GRITO_SCALE = 11;
 
 gltfLoader.load(
-    'assets/models/the_scream.glb', // RUTA DEL MODELO
-    function (gltf) {
-        cuadroGrito = gltf.scene;
-        
+  "assets/models/cuadro_el_grito.glb",
+  function (gltf) {
+    cuadroGrito = gltf.scene;
+
+    cuadroGrito.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y, CUADRO_GRITO_Z);
+    cuadroGrito.scale.set(
+      CUADRO_GRITO_SCALE,
+      CUADRO_GRITO_SCALE,
+      CUADRO_GRITO_SCALE
+    );
+
+    cuadroGrito.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.name = "Cuadro_El_Grito";
+      }
+    });
+
+    escena.add(cuadroGrito);
+
+    const luzCuadroGrito = new THREE.SpotLight(
+      0xffffff,
+      30,
+      10,
+      Math.PI / 7,
+      0.5,
+      0.5
+    );
+
+    luzCuadroGrito.position.set(
+      CUADRO_GRITO_X,
+      CUADRO_GRITO_Y + 5,
+      CUADRO_GRITO_Z + 5
+    );
+    luzCuadroGrito.castShadow = false;
+
+    const targetCuadro = new THREE.Object3D();
+    targetCuadro.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y, CUADRO_GRITO_Z);
+    escena.add(targetCuadro);
+    luzCuadroGrito.target = targetCuadro;
+
+    escena.add(luzCuadroGrito);
+
+    audioGrito = new THREE.PositionalAudio(listener);
+    audioLoader.load(
+      "assets/sounds/terrifying_scream.mp3",
+      function (buffer) {
+        audioGrito.setBuffer(buffer);
+        audioGrito.setRefDistance(8);
+        audioGrito.setMaxDistance(20);
+        audioGrito.setRolloffFactor(1);
+        audioGrito.setLoop(false);
+      },
+      undefined,
+      function (error) {
+        console.warn(
+          'Error CRÍTICO al cargar el sonido del grito. Revisa la ruta: "assets/sounds/terrifying_scream.mp3".'
+        );
+      }
+    );
+    cuadroGrito.add(audioGrito);
+  },
+  undefined,
+  function (error) {
+    console.error('Error al cargar el cuadro "El Grito":', error);
+  }
+);
+
+// --- CARGAR CUADRO ENGRANAJE ---
+const CUADRO_ENGRANAJE_X = -mitadAncho + 0.1;
+const CUADRO_ENGRANAJE_Y = mitadAlto;
+const CUADRO_ENGRANAJE_Z = 0;
+const CUADRO_ENGRANAJE_ROTATION = Math.PI / 2;
+
+gltfLoader.load(
+  "assets/models/cuadro_engranaje/scene.gltf",
+  function (gltf) {
+    cuadroEngranaje = gltf.scene;
+
+    cuadroEngranaje.position.set(
+      CUADRO_ENGRANAJE_X,
+      CUADRO_ENGRANAJE_Y,
+      CUADRO_ENGRANAJE_Z - 5
+    );
+    cuadroEngranaje.rotation.y = CUADRO_ENGRANAJE_ROTATION;
+    cuadroEngranaje.scale.set(1.5, 1.5, 1.5);
+
+    cuadroEngranaje.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.name = "Cuadro_Engranaje";
+      }
+    });
+
+    escena.add(cuadroEngranaje);
+
+    if (gltf.animations && gltf.animations.length > 0) {
+      mixerEngranaje = new THREE.AnimationMixer(gltf.scene);
+      const clip = gltf.animations[0];
+      actionEngranaje = mixerEngranaje.clipAction(clip);
+      actionEngranaje.setLoop(THREE.LoopRepeat, Infinity);
+    }
+
+    const luzCuadroEngranaje = new THREE.SpotLight(
+      0xffffff,
+      10,
+      5,
+      Math.PI / 10,
+      1,
+      1
+    );
+
+    luzCuadroEngranaje.position.set(
+      CUADRO_ENGRANAJE_X + 5,
+      CUADRO_ENGRANAJE_Y + 5,
+      CUADRO_ENGRANAJE_Z
+    );
+    luzCuadroEngranaje.castShadow = false;
+
+    const targetEngranaje = new THREE.Object3D();
+    targetEngranaje.position.set(
+      CUADRO_ENGRANAJE_X,
+      CUADRO_ENGRANAJE_Y,
+      CUADRO_ENGRANAJE_Z
+    );
+    escena.add(targetEngranaje);
+    luzCuadroEngranaje.target = targetEngranaje;
+
+    escena.add(luzCuadroEngranaje);
+  },
+  undefined,
+  function (error) {
+    console.error('Error al cargar el cuadro "Engranaje in Motion":', error);
+  }
+);
+
+// --- CARGAR VALLA CUADRO ENGRANAJE ---
+const VALLA_ENGRANAJE_X = CUADRO_ENGRANAJE_X + 5;
+const VALLA_ENGRANAJE_Z = CUADRO_ENGRANAJE_Z;
+const VALLA_ENGRANAJE_ROTATION = CUADRO_ENGRANAJE_ROTATION;
+
+gltfLoader.load(
+  "assets/models/valla/scene.gltf",
+  function (gltf) {
+    const vallaEngranaje = gltf.scene;
+
+    vallaEngranaje.position.set(VALLA_ENGRANAJE_X, 0, VALLA_ENGRANAJE_Z);
+    vallaEngranaje.rotation.y = CUADRO_ENGRANAJE_ROTATION;
+    vallaEngranaje.scale.set(3.0, 3.0, 3.0);
+
+    vallaEngranaje.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    escena.add(vallaEngranaje);
+
+    const box = new THREE.Box3().setFromObject(vallaEngranaje);
+    vallaEngranajeBoundingBox = box;
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Valla de Exhibición Izquierda:", error);
+  }
+);
+
+// --- CARGAR MODELO LÁMPARA CUADRO ENGRANAJE ---
+const LAMPARA_ENGRANAJE_Y_OFFSET = 5.0;
+const LAMPARA_ENGRANAJE_Y_POS = ALTO_SALA - LAMPARA_ENGRANAJE_Y_OFFSET;
+
+gltfLoader.load(
+  "assets/models/lamparas.glb",
+  function (gltf) {
+    const lamparaEngranaje = gltf.scene;
+    lamparaEngranaje.position.set(
+      VALLA_ENGRANAJE_X,
+      LAMPARA_ENGRANAJE_Y_POS,
+      VALLA_ENGRANAJE_Z
+    );
+    lamparaEngranaje.rotation.y = Math.PI / 2;
+    lamparaEngranaje.scale.set(
+      LAMPARA_SCALE,
+      LAMPARA_SCALE,
+      LAMPARA_SCALE
+    );
+
+    lamparaEngranaje.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    escena.add(lamparaEngranaje);
+
+    const spotLight = new THREE.SpotLight(
+      0xffffff,
+      0.5,
+      18,
+      30,
+      Math.PI / 16,
+      0.1,
+      2
+    );
+    spotLight.position.set(
+      VALLA_ENGRANAJE_X,
+      LAMPARA_ENGRANAJE_Y_POS,
+      VALLA_ENGRANAJE_Z
+    );
+
+    const targetEngranaje = new THREE.Object3D();
+    targetEngranaje.position.set(VALLA_ENGRANAJE_X, 0, VALLA_ENGRANAJE_Z);
+
+    spotLight.castShadow = true;
+    spotLight.target = targetEngranaje;
+
+    escena.add(spotLight);
+    escena.add(spotLight.target);
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Lámpara:", error);
+  }
+);
+
+// --- CARGAR CUADRO TELEVISORES ---
+const CUADRO_TELEVISORES_SCALE = 0.5;
+const CUADRO_TELEVISORES_X = mitadAncho - 3;
+const CUADRO_TELEVISORES_Y = 0;
+const CUADRO_TELEVISORES_Z = 0;
+const CUADRO_TELEVISORES_ROTATION = -Math.PI / 1;
+
+gltfLoader.load(
+  "assets/models/cuadro_televisores/scene.gltf",
+  function (gltf) {
+    cuadroTelevisores = gltf.scene;
+
+    cuadroTelevisores.position.set(
+      CUADRO_TELEVISORES_X,
+      CUADRO_TELEVISORES_Y,
+      CUADRO_TELEVISORES_Z
+    );
+    cuadroTelevisores.rotation.y = CUADRO_TELEVISORES_ROTATION;
+    cuadroTelevisores.scale.set(
+      CUADRO_TELEVISORES_SCALE,
+      CUADRO_TELEVISORES_SCALE,
+      CUADRO_TELEVISORES_SCALE
+    );
+
+    cuadroTelevisores.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.name = "Cuadro_Televisores";
+      }
+    });
+
+    escena.add(cuadroTelevisores);
     
-        cuadroGrito.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y, CUADRO_GRITO_Z); 
-        cuadroGrito.scale.set(CUADRO_GRITO_SCALE, CUADRO_GRITO_SCALE, CUADRO_GRITO_SCALE); 
-        
-        // Configurar sombras y asignar un nombre para Raycasting (futura funcionalidad)
-        cuadroGrito.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                child.name = 'Cuadro_El_Grito'; // Nombre único para la detección de clics
-            }
-        });
-        
-        escena.add(cuadroGrito);
+    // NUEVO: CALCULAR BOUNDING BOX PARA EL CUADRO TELEVISORES
+    const boxTelevisores = new THREE.Box3().setFromObject(cuadroTelevisores);
+    cuadroTelevisoresBoundingBox = boxTelevisores;
 
-        // --- LUZ DEDICADA PARA EL CUADRO 1 (SpotLight) --
-        const luzCuadroGrito = new THREE.SpotLight(0xffffff, 30, 10, Math.PI / 7, 0.5, 0.5); 
-        
-        luzCuadroGrito.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y + 5, CUADRO_GRITO_Z + 5); 
-        luzCuadroGrito.castShadow = false; 
-        
-        const targetCuadro = new THREE.Object3D();
-        targetCuadro.position.set(CUADRO_GRITO_X, CUADRO_GRITO_Y, CUADRO_GRITO_Z);
-        escena.add(targetCuadro);
-        luzCuadroGrito.target = targetCuadro;
-
-        escena.add(luzCuadroGrito);
-
-        // --- SONIDO POSICIONAL DEL GRITO ---
-        audioGrito = new THREE.PositionalAudio(listener);
-        audioLoader.load('assets/sounds/terrifying_scream.mp3', function(buffer) {
-            audioGrito.setBuffer(buffer);
-            audioGrito.setRefDistance(8); 
-            audioGrito.setMaxDistance(20); 
-            audioGrito.setRolloffFactor(1); 
-            audioGrito.setLoop(false); 
-            console.log('Buffer de audio del Grito cargado exitosamente.'); 
-        }, undefined, function(error) {
-            console.warn('Error CRÍTICO al cargar el sonido del grito. Revisa la ruta: "assets/sounds/terrifying_scream.mp3".');
-        });
-        cuadroGrito.add(audioGrito); 
-        
-        console.log('Cuadro "El Grito" cargado, escalado y posicionado. Luz puntual agregada.');
-
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar el cuadro "El Grito":', error);
+    if (gltf.animations && gltf.animations.length > 0) {
+      mixerTechnical = new THREE.AnimationMixer(gltf.scene);
+      const clip = gltf.animations[0];
+      actionTechnical = mixerTechnical.clipAction(clip);
+      actionTechnical.setLoop(THREE.LoopRepeat, Infinity);
     }
+
+    const luzCuadroTelevisores = new THREE.SpotLight(
+      0xffffff,
+      30,
+      10,
+      Math.PI / 7,
+      0.5,
+      0.5
+    );
+
+    luzCuadroTelevisores.position.set(
+      CUADRO_TELEVISORES_X - 5,
+      CUADRO_TELEVISORES_Y + 5,
+      CUADRO_TELEVISORES_Z
+    );
+    luzCuadroTelevisores.castShadow = false;
+
+    const targetTelevisores = new THREE.Object3D();
+    targetTelevisores.position.set(
+      CUADRO_TELEVISORES_X,
+      CUADRO_TELEVISORES_Y,
+      CUADRO_TELEVISORES_Z
+    );
+    escena.add(targetTelevisores);
+    luzCuadroTelevisores.target = targetTelevisores;
+
+    escena.add(luzCuadroTelevisores);
+  },
+  undefined,
+  function (error) {
+    console.error('Error al cargar el cuadro "Televisores":', error);
+  }
 );
 
-
-// --- CARGA DEL MODELO 3D (Cuadro 2: Insanity in Motion - PARED IZQUIERDA) ---
-const CUADRO_INSANITY_X = -mitadAncho + 0.1; // -29.9 (Justo en frente de la pared izquierda)
-const CUADRO_INSANITY_Y = mitadAlto; // Altura centrada (10)
-const CUADRO_INSANITY_Z = 0; // Centrado en Z
-const CUADRO_INSANITY_ROTATION = Math.PI / 2; // Rota 90 grados para mirar hacia el centro de la sala
+// --- CARGAR VALLA CUADRO TELEVISORES ---
+const VALLA_TELEVISORES_X = CUADRO_TELEVISORES_X - 9;
+const VALLA_TELEVISORES_Z = CUADRO_TELEVISORES_Z;
+const VALLA_TELEVISORES_ROTATION = -Math.PI / 2;
 
 gltfLoader.load(
-    'assets/models/psychedelic_spheres/scene.gltf', 
-    function (gltf) {
-        cuadroInsanity = gltf.scene;
-        
-        // POSICIONAMIENTO
-        cuadroInsanity.position.set(CUADRO_INSANITY_X, CUADRO_INSANITY_Y, CUADRO_INSANITY_Z - 5); 
-        cuadroInsanity.rotation.y = CUADRO_INSANITY_ROTATION; 
-        cuadroInsanity.scale.set(1.5, 1.5, 1.5); 
-        
-        // Configurar sombras y asignar un nombre para Raycasting
-        cuadroInsanity.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                child.name = 'Cuadro_Insanity'; 
-            }
-        });
-        
-        escena.add(cuadroInsanity);
-        
-        // --- ANIMACIÓN (CONFIGURADA PARA PROXIMIDAD) ---
-        if (gltf.animations && gltf.animations.length > 0) {
-            mixerInsanity = new THREE.AnimationMixer(gltf.scene);
-            const clip = gltf.animations[0]; // Tomamos la primera animación disponible
-            actionInsanity = mixerInsanity.clipAction(clip);
-            actionInsanity.setLoop(THREE.LoopRepeat, Infinity);
-            console.log('Animación "Insanity in Motion" configurada. Esperando proximidad.');
-        }
+  "assets/models/valla/scene.gltf",
+  function (gltf) {
+    const vallaTelevisores = gltf.scene;
 
-        // --- LUZ DEDICADA PARA EL CUADRO 2 (SpotLight) --
-        const luzCuadroInsanity = new THREE.SpotLight(0xffffff, 10, 5, Math.PI / 10, 1, 1); 
-        
-        // Posición de la luz: Desplazada en X y Y respecto al cuadro
-        luzCuadroInsanity.position.set(CUADRO_INSANITY_X + 5, CUADRO_INSANITY_Y + 5, CUADRO_INSANITY_Z); 
-        luzCuadroInsanity.castShadow = false; 
-        
-        const targetInsanity = new THREE.Object3D();
-        targetInsanity.position.set(CUADRO_INSANITY_X, CUADRO_INSANITY_Y, CUADRO_INSANITY_Z);
-        escena.add(targetInsanity);
-        luzCuadroInsanity.target = targetInsanity;
+    vallaTelevisores.position.set(VALLA_TELEVISORES_X, 0, VALLA_TELEVISORES_Z);
+    vallaTelevisores.rotation.y = VALLA_TELEVISORES_ROTATION;
+    vallaTelevisores.scale.set(3.0, 3.0, 3.0);
 
-        escena.add(luzCuadroInsanity);
-        
-        console.log('Cuadro "Insanity in Motion" cargado, posicionado en la pared izquierda.');
+    vallaTelevisores.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
 
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar el cuadro "Insanity in Motion":', error);
-    }
+    escena.add(vallaTelevisores);
+
+    const box = new THREE.Box3().setFromObject(vallaTelevisores);
+    vallaTelevisoresBoundingBox = box;
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Valla de Exhibición Derecha:", error);
+  }
 );
 
-
-// --- CARGA DEL MODELO 3D (Valla de Exhibición - Izquierda) ---
-const VALLA_INSANITY_X = CUADRO_INSANITY_X + 5; // 5 unidades frente al cuadro
-const VALLA_INSANITY_Z = CUADRO_INSANITY_Z; 
-const VALLA_INSANITY_ROTATION = CUADRO_INSANITY_ROTATION; // Misma rotación que el cuadro
+// --- CARGAR MODELO LÁMPARA CUADRO TELEVISORES ---
+const LAMPARA_TELEVISORES_Y_OFFSET = 5.0;
+const LAMPARA_TELEVISORES_Y_POS = ALTO_SALA - LAMPARA_TELEVISORES_Y_OFFSET;
+const LAMPARA_TELEVISORES_SCALE = 5.0;
 
 gltfLoader.load(
-    'assets/models/valla/scene.gltf', 
-    function (gltf) {
-        const vallaInsanity = gltf.scene;
-        
-        // POSICIONAMIENTO y ROTACIÓN (90 grados)
-        vallaInsanity.position.set(VALLA_INSANITY_X, 0, VALLA_INSANITY_Z); 
-        vallaInsanity.rotation.y = VALLA_INSANITY_ROTATION; 
-        vallaInsanity.scale.set(3.0, 3.0, 3.0); 
+  "assets/models/lamparas.glb",
+  function (gltf) {
+    const lamparaTelevisores = gltf.scene;
+    lamparaTelevisores.position.set(
+      VALLA_TELEVISORES_X,
+      LAMPARA_TELEVISORES_Y_POS,
+      VALLA_TELEVISORES_Z
+    );
 
-        vallaInsanity.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-        
-        escena.add(vallaInsanity);
-        
-        // --- CÁLCULO DE LA CAJA DELIMITADORA DE LA NUEVA VALLA ---
-        const box = new THREE.Box3().setFromObject(vallaInsanity);
-        vallaInsanityBoundingBox = box;
-        
-        console.log('Valla de exhibición cargada con éxito frente al cuadro izquierdo.');
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar la Valla de Exhibición Izquierda:', error);
-    }
+    lamparaTelevisores.rotation.y = Math.PI / 2;
+
+
+    lamparaTelevisores.scale.set(
+      LAMPARA_SCALE,
+      LAMPARA_SCALE,
+      LAMPARA_SCALE
+    );
+
+    lamparaTelevisores.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    escena.add(lamparaTelevisores);
+    const spotLight = new THREE.SpotLight(
+      0xffffff,
+      0.5,
+      18,
+      30,
+      Math.PI / 16,
+      0.1,
+      2
+    );
+    spotLight.position.set(
+      VALLA_TELEVISORES_X,
+      LAMPARA_TELEVISORES_Y_POS,
+      VALLA_TELEVISORES_Z
+    );
+
+    const targetTelevisores = new THREE.Object3D();
+    targetTelevisores.position.set(VALLA_TELEVISORES_X, 0, VALLA_TELEVISORES_Z);
+
+    spotLight.castShadow = true;
+    spotLight.target = targetTelevisores;
+
+    escena.add(spotLight);
+    escena.add(spotLight.target);
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Lámpara:", error);
+  }
 );
 
-
-// --- CARGA DEL MODELO 3D (Cuadro 3: Televisores - PARED DERECHA) ---
-const CUADRO_MANDALA_SCALE = 0.5; // ESCALA SOLICITADA: 1 (antes 10)
-const CUADRO_MANDALA_X = mitadAncho - 2.4; // CLAVE: 29.0 (Para sacarlo de la pared)
-const CUADRO_MANDALA_Y = 0; 
-const CUADRO_MANDALA_Z = 0; // CLAVE: Z=0 (Centrado y sin offset)
-const CUADRO_MANDALA_ROTATION = -Math.PI / 1; // Rota -90 grados para mirar hacia el centro
+// --- CARGAR CUADRO GARDEN ---
+const CUADRO_GARDEN_Z = mitadProfundidad - 0.1;
+const CUADRO_GARDEN_Y = mitadAlto;
+const CUADRO_GARDEN_X = 0;
+const CUADRO_GARDEN_SCALE = 10;
+const CUADRO_GARDEN_ROTATION = Math.PI;
 
 gltfLoader.load(
-    'assets/models/technical_difficulties/scene.gltf', 
-    function (gltf) {
-        cuadroMandala = gltf.scene;
-        
-        // POSICIONAMIENTO CORREGIDO: Usando las nuevas constantes
-        cuadroMandala.position.set(CUADRO_MANDALA_X, CUADRO_MANDALA_Y, CUADRO_MANDALA_Z); 
-        cuadroMandala.rotation.y = CUADRO_MANDALA_ROTATION; 
-        cuadroMandala.scale.set(CUADRO_MANDALA_SCALE, CUADRO_MANDALA_SCALE, CUADRO_MANDALA_SCALE); // CLAVE: Escala a 1
-        
-        // Configurar sombras y asignar un nombre
-        cuadroMandala.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                child.name = 'Cuadro_Mandala'; 
-            }
-        });
-        
-        escena.add(cuadroMandala);
-        
-        // --- LUZ DEDICADA PARA EL CUADRO 3 (SpotLight) --
-        const luzCuadroMandala = new THREE.SpotLight(0xffffff, 30, 10, Math.PI / 7, 0.5, 0.5); 
-        
-        // Posición de la luz ajustada a Z=0
-        luzCuadroMandala.position.set(CUADRO_MANDALA_X - 5, CUADRO_MANDALA_Y + 5, CUADRO_MANDALA_Z); 
-        luzCuadroMandala.castShadow = false; 
-        
-        const targetMandala = new THREE.Object3D();
-        targetMandala.position.set(CUADRO_MANDALA_X, CUADRO_MANDALA_Y, CUADRO_MANDALA_Z);
-        escena.add(targetMandala);
-        luzCuadroMandala.target = targetMandala;
+  "assets/models/cuadro_garden/scene.gltf",
+  function (gltf) {
+    cuadroGarden = gltf.scene;
 
-        escena.add(luzCuadroMandala);
-        
-        console.log('Cuadro "Mandala" cargado, posicionado en la pared derecha con escala 1.');
+    cuadroGarden.position.set(
+      CUADRO_GARDEN_X,
+      CUADRO_GARDEN_Y,
+      CUADRO_GARDEN_Z
+    );
+    cuadroGarden.rotation.y = CUADRO_GARDEN_ROTATION;
+    cuadroGarden.scale.set(
+      CUADRO_GARDEN_SCALE,
+      CUADRO_GARDEN_SCALE,
+      CUADRO_GARDEN_SCALE
+    );
 
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar el cuadro "Mandala":', error);
+    cuadroGarden.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.name = "Cuadro_Garden";
+      }
+    });
+
+    escena.add(cuadroGarden);
+
+    // NUEVO: CALCULAR BOUNDING BOX PARA EL CUADRO GARDEN
+    const boxGarden = new THREE.Box3().setFromObject(cuadroGarden);
+    cuadroGardenBoundingBox = boxGarden;
+
+    if (gltf.animations && gltf.animations.length > 0) {
+      mixerGarden = new THREE.AnimationMixer(gltf.scene);
+      const clip = gltf.animations[0];
+      actionGarden = mixerGarden.clipAction(clip);
+      actionGarden.setLoop(THREE.LoopRepeat, Infinity);
     }
+
+    const luzCuadroGarden = new THREE.SpotLight(
+      0xffffff,
+      30,
+      10,
+      Math.PI / 7,
+      0.5,
+      0.5
+    );
+
+    luzCuadroGarden.position.set(
+      CUADRO_GARDEN_X,
+      CUADRO_GARDEN_Y + 5,
+      CUADRO_GARDEN_Z - 5
+    );
+    luzCuadroGarden.castShadow = false;
+
+    const targetGarden = new THREE.Object3D();
+    targetCuadro.position.set(
+      CUADRO_GARDEN_X,
+      CUADRO_GARDEN_Y,
+      CUADRO_GARDEN_Z
+    );
+    escena.add(targetGarden);
+    luzCuadroGarden.target = targetGarden;
+
+    escena.add(luzCuadroGarden);
+  },
+  undefined,
+  function (error) {
+    console.error('Error al cargar el cuadro "Garden":', error);
+  }
 );
 
-
-// --- CARGA DEL MODELO 3D (Valla de Exhibición - Derecha) ---
-const VALLA_MANDALA_X = CUADRO_MANDALA_X - 9; // 5 unidades frente al cuadro (X=24.0)
-const VALLA_MANDALA_Z = CUADRO_MANDALA_Z; // Z=0
-const VALLA_MANDALA_ROTATION =  -Math.PI / 2; // Misma rotación que el cuadro
+// --- CARGAR VALLA CUADRO GARDEN ---
+const VALLA_GARDEN_X = CUADRO_GARDEN_X - 2;
+const VALLA_GARDEN_Z = CUADRO_GARDEN_Z - 10;
+const VALLA_GARDEN_ROTATION = 0;
 
 gltfLoader.load(
-    'assets/models/valla/scene.gltf', 
-    function (gltf) {
-        const vallaMandala = gltf.scene;
-        
-        // POSICIONAMIENTO y ROTACIÓN (-90 grados)
-        vallaMandala.position.set(VALLA_MANDALA_X, 0, VALLA_MANDALA_Z); 
-        vallaMandala.rotation.y = VALLA_MANDALA_ROTATION; 
-        vallaMandala.scale.set(3.0, 3.0, 3.0); 
+  "assets/models/valla/scene.gltf",
+  function (gltf) {
+    const vallaGarden = gltf.scene;
 
-        vallaMandala.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-        
-        escena.add(vallaMandala);
-        
-        // --- CÁLCULO DE LA CAJA DELIMITADORA DE LA NUEVA VALLA ---
-        const box = new THREE.Box3().setFromObject(vallaMandala);
-        vallaMandalaBoundingBox = box;
-        
-        console.log('Valla de exhibición cargada con éxito frente al cuadro derecho.');
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar la Valla de Exhibición Derecha:', error);
-    }
+    vallaGarden.position.set(VALLA_GARDEN_X, 0, VALLA_GARDEN_Z);
+    vallaGarden.rotation.y = VALLA_GARDEN_ROTATION;
+    vallaGarden.scale.set(3.0, 3.0, 3.0);
+
+    vallaGarden.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    escena.add(vallaGarden);
+
+    const box = new THREE.Box3().setFromObject(vallaGarden);
+    vallaGardenBoundingBox = box;
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Valla de Exhibición Garden:", error);
+  }
 );
 
-
-// --- CARGA DEL MODELO 3D (Cuadro 4: Garden - PARED FRONTAL) (NUEVO BLOQUE) ---
-const CUADRO_GARDEN_Z = mitadProfundidad - 0.1; // 39.9 (Justo en frente de la pared frontal)
-const CUADRO_GARDEN_Y = mitadAlto; 
-const CUADRO_GARDEN_X = 0; // Centrado en X
-const CUADRO_GARDEN_SCALE = 10; 
-const CUADRO_GARDEN_ROTATION = Math.PI; // Rota 180 grados para mirar hacia el centro de la sala
+// --- CARGAR MODELO LÁMPARA CUADRO GARDEN ---
+const LAMPARA_GARDEN_Y_OFFSET = 5.0;
+const LAMPARA_GARDEN_Y_POS = ALTO_SALA - LAMPARA_GARDEN_Y_OFFSET;
+const LAMPARA_GARDEN_SCALE = 5.0;
 
 gltfLoader.load(
-    'assets/models/cuadro_garden/scene.gltf', 
-    function (gltf) {
-        cuadroGarden = gltf.scene;
-        
-        // POSICIONAMIENTO
-        cuadroGarden.position.set(CUADRO_GARDEN_X, CUADRO_GARDEN_Y, CUADRO_GARDEN_Z); 
-        cuadroGarden.rotation.y = CUADRO_GARDEN_ROTATION; 
-        cuadroGarden.scale.set(CUADRO_GARDEN_SCALE, CUADRO_GARDEN_SCALE, CUADRO_GARDEN_SCALE); 
-        
-        // Configurar sombras y asignar un nombre para Raycasting
-        cuadroGarden.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                child.name = 'Cuadro_Garden'; 
-            }
-        });
-        
-        escena.add(cuadroGarden);
-        
-        // --- ANIMACIÓN (CONFIGURADA PARA PROXIMIDAD) ---
-        if (gltf.animations && gltf.animations.length > 0) {
-            mixerGarden = new THREE.AnimationMixer(gltf.scene);
-            const clip = gltf.animations[0];
-            actionGarden = mixerGarden.clipAction(clip);
-            actionGarden.setLoop(THREE.LoopRepeat, Infinity);
-            console.log('Animación "Cuadro Garden" configurada. Esperando proximidad.');
-        }
+  "assets/models/lamparas.glb",
+  function (gltf) {
+    const lamparaGarden = gltf.scene;
+    lamparaGarden.position.set(
+      VALLA_GARDEN_X + 2,
+      LAMPARA_GARDEN_Y_POS,
+      VALLA_GARDEN_Z
+    );
 
-        // --- LUZ DEDICADA PARA EL CUADRO 4 (SpotLight) --
-        const luzCuadroGarden = new THREE.SpotLight(0xffffff, 30, 10, Math.PI / 7, 0.5, 0.5); 
-        
-        // La luz viene de Z-5, apuntando hacia el cuadro
-        luzCuadroGarden.position.set(CUADRO_GARDEN_X, CUADRO_GARDEN_Y + 5, CUADRO_GARDEN_Z - 5); 
-        luzCuadroGarden.castShadow = false; 
-        
-        const targetGarden = new THREE.Object3D();
-        targetGarden.position.set(CUADRO_GARDEN_X, CUADRO_GARDEN_Y, CUADRO_GARDEN_Z);
-        escena.add(targetGarden);
-        luzCuadroGarden.target = targetGarden;
+    lamparaGarden.scale.set(
+      LAMPARA_SCALE,
+      LAMPARA_SCALE,
+      LAMPARA_SCALE
+    );
 
-        escena.add(luzCuadroGarden);
-        
-        console.log('Cuadro "Garden" cargado en pared frontal.');
+    lamparaGarden.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
 
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar el cuadro "Garden":', error);
-    }
+    escena.add(lamparaGarden);
+    const spotLight = new THREE.SpotLight(
+      0xffffff,
+      0.5,
+      18,
+      30,
+      Math.PI / 16,
+      0.1,
+      2
+    );
+    spotLight.position.set(
+      VALLA_GARDEN_X,
+      LAMPARA_GARDEN_Y_POS,
+      VALLA_GARDEN_Z
+    );
+
+    const targetGarden = new THREE.Object3D();
+    targetGarden.position.set(VALLA_GARDEN_X, 0, VALLA_GARDEN_Z);
+
+    spotLight.castShadow = true;
+    spotLight.target = targetGarden;
+
+    escena.add(spotLight);
+    escena.add(spotLight.target);
+  },
+  undefined,
+  function (error) {
+    console.error("Error al cargar la Lámpara:", error);
+  }
 );
 
+// --- CREAR LIENZO DIBUJO USUARIO ---
+const CUADRO_LIENZO_X = -15;
+const CUADRO_LIENZO_Y = mitadAlto;
+const CUADRO_LIENZO_Z = -mitadProfundidad + 0.1;
+const CUADRO_LIENZO_ROTATION = 0;
+const CUADRO_LIENZO_WIDTH = 10;
+const CUADRO_LIENZO_HEIGHT = 8;
 
-// --- CARGA DEL MODELO 3D (Valla de Exhibición - Garden) (NUEVO BLOQUE) ---
-const VALLA_GARDEN_X = CUADRO_GARDEN_X - 2; 
-const VALLA_GARDEN_Z = CUADRO_GARDEN_Z - 10; // 5 unidades frente al cuadro
-const VALLA_GARDEN_ROTATION = 0; // Rotación de la valla que mira al centro
-
-gltfLoader.load(
-    'assets/models/valla/scene.gltf', 
-    function (gltf) {
-        const vallaGarden = gltf.scene;
-        
-        // POSICIONAMIENTO y ROTACIÓN (0 grados)
-        vallaGarden.position.set(VALLA_GARDEN_X, 0, VALLA_GARDEN_Z); 
-        vallaGarden.rotation.y = VALLA_GARDEN_ROTATION; 
-        vallaGarden.scale.set(3.0, 3.0, 3.0); 
-
-        vallaGarden.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-        
-        escena.add(vallaGarden);
-        
-        // --- CÁLCULO DE LA CAJA DELIMITADORA DE LA NUEVA VALLA ---
-        const box = new THREE.Box3().setFromObject(vallaGarden);
-        vallaGardenBoundingBox = box;
-        
-        console.log('Valla de exhibición cargada con éxito frente al cuadro Garden.');
-    },
-    undefined,
-    function (error) {
-        console.error('Error al cargar la Valla de Exhibición Garden:', error);
-    }
+const planeGeometry = new THREE.PlaneGeometry(
+  CUADRO_LIENZO_WIDTH,
+  CUADRO_LIENZO_HEIGHT
 );
+const initialMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  side: THREE.DoubleSide,
+});
+userArtMesh = new THREE.Mesh(planeGeometry, initialMaterial);
 
+userArtMesh.position.set(CUADRO_LIENZO_X, CUADRO_LIENZO_Y, CUADRO_LIENZO_Z);
+userArtMesh.rotation.y = CUADRO_LIENZO_ROTATION;
+userArtMesh.name = "User_Art_Canvas";
 
-// --- FUNCIÓN DE ANIMACIÓN (LOOP PRINCIPAL DEL JUEGO) ---
+escena.add(userArtMesh);
+
+setupDrawingSystem();
+
+// --- LOOP PRINCIPAL JUEGO ---
 function animar() {
   requestAnimationFrame(animar);
-  
+
   const delta = clock.getDelta();
 
   if (modeloGLTF) {
-      
-      const step = VELOCIDAD * delta; 
-      let isMoving = false; 
+    const step = VELOCIDAD * delta;
+    let isMoving = false;
 
-      // Guardamos la posición anterior para colisiones
+    // --- BLOQUEAR MOVIMIENTO UI ---
+    if (!isPromptVisible && !isDrawingMode) {
       const oldPositionX = modeloGLTF.position.x;
       const oldPositionZ = modeloGLTF.position.z;
 
-      // 1. Determinar la dirección de movimiento a partir de la cámara
+      // --- CALCULAR DIRECCIÓN CÁMARA ---
       const cameraDirection = new THREE.Vector3();
-      cameraPivot.getWorldDirection(cameraDirection); 
-      cameraDirection.y = 0; 
+      cameraPivot.getWorldDirection(cameraDirection);
+      cameraDirection.y = 0;
       cameraDirection.normalize();
 
       const right = new THREE.Vector3();
-      right.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection); 
+      right.crossVectors(new THREE.Vector3(0, 1, 0), cameraDirection);
 
-      // 2. Aplicar el movimiento al modelo GLTF
       let forwardVector = new THREE.Vector3();
       let strafeVector = new THREE.Vector3();
 
+      // --- GESTIONAR ENTRADA TECLADO ---
       if (keys.ArrowUp || keys.w) {
-          forwardVector.copy(cameraDirection).multiplyScalar(step);
-          isMoving = true;
+        forwardVector.copy(cameraDirection).multiplyScalar(step);
+        isMoving = true;
       }
       if (keys.ArrowDown || keys.s) {
-          forwardVector.copy(cameraDirection).multiplyScalar(-step); 
-          isMoving = true;
+        forwardVector.copy(cameraDirection).multiplyScalar(-step);
+        isMoving = true;
       }
       if (keys.ArrowLeft || keys.a) {
-          strafeVector.copy(right).multiplyScalar(-step);
-          isMoving = true;
+        strafeVector.copy(right).multiplyScalar(-step);
+        isMoving = true;
       }
       if (keys.ArrowRight || keys.d) {
-          strafeVector.copy(right).multiplyScalar(step);
-          isMoving = true;
+        strafeVector.copy(right).multiplyScalar(step);
+        isMoving = true;
       }
-      
-      // Aplicar el movimiento a una posición temporal (para usar en colisión)
+
+      // --- APLICAR NUEVA POSICIÓN ---
       const nextPositionX = oldPositionX + forwardVector.x + strafeVector.x;
       const nextPositionZ = oldPositionZ + forwardVector.z + strafeVector.z;
-      
-      // Aplicar la posición
+
       modeloGLTF.position.x = nextPositionX;
       modeloGLTF.position.z = nextPositionZ;
-      
-      // --- LÓGICA DE COLISIÓN (TODAS LAS VALLAS Y OBJETOS) ---
+
+      // --- DETECTAR COLISIÓN OBJETOS ---
       let collisionDetected = false;
       const honguitoBox = new THREE.Box3();
       honguitoBox.setFromCenterAndSize(
-        new THREE.Vector3(modeloGLTF.position.x, ALTURA_HONGUITO, modeloGLTF.position.z),
-        new THREE.Vector3(RADIO_COLISION * 2, ALTURA_HONGUITO * 2, RADIO_COLISION * 2)
+        new THREE.Vector3(
+          modeloGLTF.position.x,
+          ALTURA_HONGUITO,
+          modeloGLTF.position.z
+        ),
+        new THREE.Vector3(
+          RADIO_COLISION * 2,
+          ALTURA_HONGUITO * 2,
+          RADIO_COLISION * 2
+        )
       );
 
-      // Colisión con la Estatua
       if (estatuaBoundingBox && estatuaBoundingBox.intersectsBox(honguitoBox)) {
-          collisionDetected = true;
+        collisionDetected = true;
       }
-      
-      // Colisión con la Valla Central 
+
       if (vallaBoundingBox && vallaBoundingBox.intersectsBox(honguitoBox)) {
-          collisionDetected = true;
-      }
-      
-      // Colisión con la Valla Izquierda 
-      if (vallaInsanityBoundingBox && vallaInsanityBoundingBox.intersectsBox(honguitoBox)) {
-          collisionDetected = true;
-      }
-      
-      // Colisión con la Valla Derecha 
-      if (vallaMandalaBoundingBox && vallaMandalaBoundingBox.intersectsBox(honguitoBox)) {
-          collisionDetected = true;
+        collisionDetected = true;
       }
 
-      // Colisión con la Valla Garden (NUEVA)
-      if (vallaGardenBoundingBox && vallaGardenBoundingBox.intersectsBox(honguitoBox)) {
-          collisionDetected = true;
+      if (
+        vallaEngranajeBoundingBox &&
+        vallaEngranajeBoundingBox.intersectsBox(honguitoBox)
+      ) {
+        collisionDetected = true;
+      }
+
+      if (
+        vallaTelevisoresBoundingBox &&
+        vallaTelevisoresBoundingBox.intersectsBox(honguitoBox)
+      ) {
+        collisionDetected = true;
+      }
+
+      if (
+        vallaGardenBoundingBox &&
+        vallaGardenBoundingBox.intersectsBox(honguitoBox)
+      ) {
+        collisionDetected = true;
+      }
+
+      // Colisión con cuadro Televisores
+      if (
+        cuadroTelevisoresBoundingBox &&
+        cuadroTelevisoresBoundingBox.intersectsBox(honguitoBox)
+      ) {
+        collisionDetected = true;
       }
       
+      // Colisión con cuadro Garden
+      if (
+        cuadroGardenBoundingBox &&
+        cuadroGardenBoundingBox.intersectsBox(honguitoBox)
+      ) {
+        collisionDetected = true;
+      }
+
+      // --- REVERTIR COLISIÓN ---
       if (collisionDetected) {
-          // Revertir la posición si hay colisión
-          modeloGLTF.position.x = oldPositionX;
-          modeloGLTF.position.z = oldPositionZ;
-          isMoving = false; // Detener animación si choca
+        modeloGLTF.position.x = oldPositionX;
+        modeloGLTF.position.z = oldPositionZ;
+        isMoving = false;
       }
-      // ----------------------------------------------------
 
-
-      // 3. Rotar el modelo (Honguito) para que mire hacia donde se mueve
+      // --- ROTAR MODELO MOVIMIENTO ---
       if (isMoving) {
-          const movementVector = new THREE.Vector3(
-              modeloGLTF.position.x - oldPositionX,
-              0,
-              modeloGLTF.position.z - oldPositionZ
-          ).normalize();
-          
-          const targetAngle = Math.atan2(movementVector.x, movementVector.z);
-          
-          modeloGLTF.rotation.y = THREE.MathUtils.lerp(modeloGLTF.rotation.y, targetAngle, 0.2); 
+        const movementVector = new THREE.Vector3(
+          modeloGLTF.position.x - oldPositionX,
+          0,
+          modeloGLTF.position.z - oldPositionZ
+        ).normalize();
+
+        const targetAngle = Math.atan2(movementVector.x, movementVector.z);
+
+        modeloGLTF.rotation.y = THREE.MathUtils.lerp(
+          modeloGLTF.rotation.y,
+          targetAngle,
+          0.2
+        );
       }
 
-
-      // --- COLISIÓN DE PAREDES (Aplicada al modelo) ---
-      const maxDistX = mitadAncho - RADIO_COLISION; 
-      const maxDistZ = mitadProfundidad - RADIO_COLISION; 
+      // --- DETECTAR COLISIÓN PAREDES ---
+      const maxDistX = mitadAncho - RADIO_COLISION;
+      const maxDistZ = mitadProfundidad - RADIO_COLISION;
 
       let newPositionX = modeloGLTF.position.x;
       let newPositionZ = modeloGLTF.position.z;
 
-      // Colisión X
       if (newPositionX > maxDistX || newPositionX < -maxDistX) {
-          modeloGLTF.position.x = oldPositionX; 
+        modeloGLTF.position.x = oldPositionX;
       }
-      // Colisión Z
       if (newPositionZ > maxDistZ || newPositionZ < -maxDistZ) {
-          modeloGLTF.position.z = oldPositionZ; 
+        modeloGLTF.position.z = oldPositionZ;
       }
 
-      // 4. Sincronizar Cámara/Pivote con el Modelo
+      // --- SINCRONIZAR CÁMARA PIVOTE ---
       cameraPivot.position.x = modeloGLTF.position.x;
-      cameraPivot.position.z = modeloGLTF.position.z; 
-      
-      // 5. Control de Animaciones del HONGUITO
-      if (mixer && walkAction) {
-          if (isMoving && currentAnimation !== walkAction) {
-              if (currentAnimation) currentAnimation.fadeOut(0.2).stop(); 
-              walkAction.reset().fadeIn(0.2).play(); 
-              currentAnimation = walkAction;
-          } else if (!isMoving && currentAnimation === walkAction) {
-              walkAction.fadeOut(0.2).stop(); 
-              currentAnimation = null;
-          }
+      cameraPivot.position.z = modeloGLTF.position.z;
+    }
+
+    // --- CONTROL ANIMACIÓN JUGADOR ---
+    if (mixer && walkAction) {
+      if (isMoving && currentAnimation !== walkAction) {
+        if (currentAnimation) currentAnimation.fadeOut(0.2).stop();
+        walkAction.reset().fadeIn(0.2).play();
+        currentAnimation = walkAction;
+      } else if (!isMoving && currentAnimation === walkAction) {
+        walkAction.fadeOut(0.2).stop();
+        currentAnimation = null;
       }
-      
-      // 5b. Lógica de Proximidad de ANIMACIÓN (Cuadro Insanity)
-      if (cuadroInsanity && actionInsanity) {
-          const playerPosXZ = modeloGLTF.position.clone();
-          const cuadroInsanityPosXZ = cuadroInsanity.position.clone();
-          
-          playerPosXZ.y = 0;
-          cuadroInsanityPosXZ.y = 0; // Calculamos la distancia horizontal
-          
-          const distanciaAInsanity = playerPosXZ.distanceTo(cuadroInsanityPosXZ);
-          
-          const zonaActivacionInsanity = 10.0; // Distancia para empezar a animar
-          const zonaReseteoInsanity = 13.0;  // Distancia para detener la animación
+    }
 
-          if (distanciaAInsanity < zonaActivacionInsanity) { 
-              if (!actionInsanity.isRunning()) {
-                  actionInsanity.play();
-                  console.log('Animación Cuadro Insanity INICIADA por proximidad.');
-              }
-          } else if (distanciaAInsanity > zonaReseteoInsanity) {
-              if (actionInsanity.isRunning()) {
-                  actionInsanity.stop();
-                  console.log('Animación Cuadro Insanity DETENIDA por alejamiento.');
-              }
-          }
+    // --- ANIMACIÓN CUADRO ENGRANAJE ---
+    if (
+      cuadroEngranaje &&
+      actionEngranaje &&
+      !isDrawingMode &&
+      !isPromptVisible
+    ) {
+      const playerPosXZ = modeloGLTF.position.clone();
+      const cuadroEngranajePosXZ = cuadroEngranaje.position.clone();
+
+      playerPosXZ.y = 0;
+      cuadroEngranajePosXZ.y = 0;
+
+      const distanciaAEngranaje = playerPosXZ.distanceTo(cuadroEngranajePosXZ);
+
+      const zonaActivacionEngranaje = 10.0;
+      const zonaReseteoEngranaje = 13.0;
+
+      if (distanciaAEngranaje < zonaActivacionEngranaje) {
+        if (!actionEngranaje.isRunning()) {
+          actionEngranaje.play();
+        }
+      } else if (distanciaAEngranaje > zonaReseteoEngranaje) {
+        if (actionEngranaje.isRunning()) {
+          actionEngranaje.stop();
+        }
       }
+    }
 
-      // 5c. Lógica de Proximidad de ANIMACIÓN (Cuadro Technical Difficulties)
-      if (cuadroMandala && actionTechnical) {
-          const playerPosXZ = modeloGLTF.position.clone();
-          const cuadroTechnicalPosXZ = cuadroMandala.position.clone(); 
-          
-          playerPosXZ.y = 0;
-          cuadroTechnicalPosXZ.y = 0; 
-          
-          const distanciaATechnical = playerPosXZ.distanceTo(cuadroTechnicalPosXZ);
-          
-          const zonaActivacionTechnical = 8.0; 
-          const zonaReseteoTechnical = 11.0;  
+    // --- ANIMACIÓN CUADRO TELEVISORES ---
+    if (
+      cuadroTelevisores &&
+      actionTechnical &&
+      !isDrawingMode &&
+      !isPromptVisible
+    ) {
+      const playerPosXZ = modeloGLTF.position.clone();
+      const cuadroTechnicalPosXZ = cuadroTelevisores.position.clone();
 
-          if (distanciaATechnical < zonaActivacionTechnical) { 
-              if (!actionTechnical.isRunning()) {
-                  actionTechnical.play();
-                  console.log('Animación Cuadro Technical Difficulties INICIADA por proximidad.');
-              }
-          } else if (distanciaATechnical > zonaReseteoTechnical) {
-              if (actionTechnical.isRunning()) {
-                  actionTechnical.stop();
-                  console.log('Animación Cuadro Technical Difficulties DETENIDA por alejamiento.');
-              }
-          }
+      playerPosXZ.y = 0;
+      cuadroTechnicalPosXZ.y = 0;
+
+      const distanciaATechnical = playerPosXZ.distanceTo(cuadroTechnicalPosXZ);
+
+      const zonaActivacionTechnical = 8.0;
+      const zonaReseteoTechnical = 11.0;
+
+      if (distanciaATechnical < zonaActivacionTechnical) {
+        if (!actionTechnical.isRunning()) {
+          actionTechnical.play();
+        }
+      } else if (distanciaATechnical > zonaReseteoTechnical) {
+        if (actionTechnical.isRunning()) {
+          actionTechnical.stop();
+        }
       }
+    }
 
-      // 5d. Lógica de Proximidad de ANIMACIÓN (Cuadro Garden) (NUEVA LÓGICA)
-      if (cuadroGarden && actionGarden) {
-          const playerPosXZ = modeloGLTF.position.clone();
-          const cuadroGardenPosXZ = cuadroGarden.position.clone();
-          
-          playerPosXZ.y = 0;
-          cuadroGardenPosXZ.y = 0; 
-          
-          const distanciaAGarden = playerPosXZ.distanceTo(cuadroGardenPosXZ);
-          
-          const zonaActivacionGarden = 11.0; 
-          const zonaReseteoGarden = 13.0;  
+    // --- ANIMACIÓN CUADRO GARDEN ---
+    if (cuadroGarden && actionGarden && !isDrawingMode && !isPromptVisible) {
+      const playerPosXZ = modeloGLTF.position.clone();
+      const cuadroGardenPosXZ = cuadroGarden.position.clone();
 
-          if (distanciaAGarden < zonaActivacionGarden) { 
-              if (!actionGarden.isRunning()) {
-                  actionGarden.play();
-                  console.log('Animación Cuadro Garden INICIADA por proximidad.');
-              }
-          } else if (distanciaAGarden > zonaReseteoGarden) {
-              if (actionGarden.isRunning()) {
-                  actionGarden.stop();
-                  console.log('Animación Cuadro Garden DETENIDA por alejamiento.');
-              }
-          }
+      playerPosXZ.y = 0;
+      cuadroGardenPosXZ.y = 0;
+
+      const distanciaAGarden = playerPosXZ.distanceTo(cuadroGardenPosXZ);
+
+      const zonaActivacionGarden = 12;
+      const zonaReseteoGarden = 15.0;
+
+      if (distanciaAGarden < zonaActivacionGarden) {
+        if (!actionGarden.isRunning()) {
+          actionGarden.play();
+        }
+      } else if (distanciaAGarden > zonaReseteoGarden) {
+        if (actionGarden.isRunning()) {
+          actionGarden.stop();
+        }
       }
-      
-      // 5e. Actualización de Mixers
-      if (mixerInsanity) {
-          mixerInsanity.update(delta);
-      }
-      if (mixerTechnical) {
-          mixerTechnical.update(delta);
-      }
-      if (mixerGarden) { // NUEVO MIXER
-          mixerGarden.update(delta);
-      }
+    }
 
+    // --- ACTUALIZAR MIXERS ANIMACIONES ---
+    if (mixerEngranaje) {
+      mixerEngranaje.update(delta);
+    }
+    if (mixerTechnical) {
+      mixerTechnical.update(delta);
+    }
+    if (mixerGarden) {
+      mixerGarden.update(delta);
+    }
 
-      // 6. Iluminación Local
-      luzHonguito.position.copy(modeloGLTF.position);
-      luzHonguito.position.y += 2.5; 
+    // --- POSICIONAR LUZ JUGADOR ---
+    luzHonguito.position.copy(modeloGLTF.position);
+    luzHonguito.position.y += 2.5;
 
-      // 7. Lógica de Proximidad de Audio (El Grito - ÚNICA VEZ)
-      if (cuadroGrito && audioGrito && audioGrito.buffer) {
-          // CLAVE: Creamos vectores temporales y ajustamos Y=0 para calcular la distancia horizontal
-          const playerPosXZ = modeloGLTF.position.clone();
-          const cuadroPosXZ = cuadroGrito.position.clone();
-          
-          playerPosXZ.y = 0;
-          cuadroPosXZ.y = 0;
-          
-          const distanciaAlGrito = playerPosXZ.distanceTo(cuadroPosXZ); // DISTANCIA HORIZONTAL
-          
-          const zonaActivacion = 9.0; 
-          const zonaReseteo = 12.0;  
+    // --- GESTIÓN AUDIO GRITO ---
+    if (
+      cuadroGrito &&
+      audioGrito &&
+      audioGrito.buffer &&
+      !isDrawingMode &&
+      !isPromptVisible
+    ) {
+      const playerPosXZ = modeloGLTF.position.clone();
+      const cuadroPosXZ = cuadroGrito.position.clone();
 
-          if (distanciaAlGrito < zonaActivacion) { 
-              if (!gritoReproducido) {
-                  // Reanuda el contexto de audio justo antes de reproducir, como doble verificación
-                  audioGrito.context.resume().then(() => {
-                      if (audioGrito.isPlaying) audioGrito.stop(); 
-                      audioGrito.play();
-                      gritoReproducido = true;
-                      
-                      console.log('¡ZONA DE GRITO ALCANZADA! Reproduciendo...'); 
-                      
-                      // Baja el volumen ambiente para destacar el grito (CLAVE: A 0.05)
-                      if (audioAmbiente && audioAmbiente.isPlaying) audioAmbiente.setVolume(0.05); 
-                  }).catch(e => {
-                      console.error("Error al reanudar el contexto de audio para el grito:", e);
-                  });
-              }
-          } else if (distanciaAlGrito > zonaReseteo) {
-              // Resetear el estado si se aleja lo suficiente
-              gritoReproducido = false; 
-              // Volver al volumen ambiente normal
-              if (audioAmbiente && audioAmbiente.isPlaying) audioAmbiente.setVolume(0.5); 
-          }
+      playerPosXZ.y = 0;
+      cuadroPosXZ.y = 0;
+
+      const distanciaAlGrito = playerPosXZ.distanceTo(cuadroPosXZ);
+
+      const zonaActivacion = 9.0;
+      const zonaReseteo = 12.0;
+
+      if (distanciaAlGrito < zonaActivacion) {
+        if (!gritoReproducido) {
+          audioGrito.context
+            .resume()
+            .then(() => {
+              if (audioGrito.isPlaying) audioGrito.stop();
+              audioGrito.play();
+              gritoReproducido = true;
+
+              if (audioAmbiente && audioAmbiente.isPlaying)
+                audioAmbiente.setVolume(0.05);
+            })
+            .catch((e) => {
+              console.error(
+                "Error al reanudar el contexto de audio para el grito:",
+                e
+              );
+            });
+        }
+      } else if (distanciaAlGrito > zonaReseteo) {
+        gritoReproducido = false;
+        if (audioAmbiente && audioAmbiente.isPlaying)
+          audioAmbiente.setVolume(0.5);
       }
+    }
   }
 
-
+  // --- ACTUALIZAR MIXER GENERAL ---
   if (mixer) {
     mixer.update(delta);
   }
 
+  // --- RENDERIZAR ESCENA CÁMARA ---
   renderizador.render(escena, camara);
 }
 animar();
