@@ -8,9 +8,7 @@ El objetivo es ofrecer una experiencia sensorial donde la exploración y la crea
 ## 🎮 Experiencia del usuario
 
 El jugador controla a **Fuji**, una *honguita humanizada* que explora libremente las salas del museo.  
-A medida que se desplaza, activa diferentes obras que reaccionan mediante **movimiento, luz o sonido**, generando una experiencia envolvente.  
-Además, puede abrir un **lienzo interactivo** presionando la tecla **G**, entrando en **modo dibujo**, donde puede expresarse artísticamente dentro del museo.  
-Presionando nuevamente **G**, puede salir de este modo y continuar su recorrido.
+A medida que se desplaza, activa diferentes obras que reaccionan mediante **movimiento, luz o sonido**, generando una experiencia envolvente.
 
 ---
 
