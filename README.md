@@ -7,7 +7,7 @@ El objetivo es ofrecer una experiencia sensorial donde la exploración y la crea
 
 ## 🎮 Experiencia del usuario
 
-El jugador controla a **Fuji**, una *honguita humanizada* que explora libremente las salas del museo.  
+El jugador controla a **Amanita Muscaria**, una *honguita humanizada* que explora libremente las salas del museo.  
 A medida que se desplaza, activa diferentes obras que reaccionan mediante **movimiento, luz o sonido**, generando una experiencia envolvente.
 
 ---
@@ -100,13 +100,14 @@ Cada obra fue diseñada con su propia identidad visual y sensorial, utilizando *
 
 ## 📸 Galería del proyecto
 
-> *(Sección para agregar capturas de pantalla y vistas del museo una vez finalizada la etapa visual del proyecto.)*
+<img width="1366" height="635" alt="image" src="https://github.com/user-attachments/assets/f8d04fdf-47c8-4a4e-88d1-33ee8cf5aa89" />
+
 
 ---
 
 ## 📄 Documento de sistematización del proceso creativo
 
-> *(Este documento será adjuntado próximamente, incluyendo el desarrollo conceptual, las decisiones estéticas y técnicas, y una reflexión sobre el proceso creativo del proyecto.)*
+> *https://docs.google.com/document/d/194Zq6EpGe_HITr-96vr5aNOPSg0yNPlx8tWhhr18GMs/edit?usp=sharing*
 
 ---
 
